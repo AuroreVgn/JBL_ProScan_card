@@ -6,7 +6,7 @@
 
 # JBL ProScan Lovelace Card
 
-Integratuon available **[here](https://github.com/AuroreVgn/JBL_ProScan/)**.
+Integration available **[here](https://github.com/AuroreVgn/JBL_ProScan/)**.
 
 ## Features
 - Responsive
