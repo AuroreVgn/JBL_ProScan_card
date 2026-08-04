@@ -28,14 +28,15 @@ A modern Lovelace card for the **JBL ProScan** Home Assistant integration.
 
 ## Screenshots
 
-### Dashboard
-<img width="368" alt="Dashboard" src="https://github.com/user-attachments/assets/a22c70c7-bd5f-44b8-8af3-fa19182adf93" />
+### Light mode
+<img width="762" height="1031" alt="image" src="https://github.com/user-attachments/assets/1985667d-bb58-4636-9398-c0945741cf09" />
 
 ### Dark mode
-<img width="371" alt="Dark mode" src="https://github.com/user-attachments/assets/02aacc23-b05b-46be-91fd-c9a621a89771" />
+<img width="762" height="1031" alt="image" src="https://github.com/user-attachments/assets/c7c45b70-2812-4550-bea3-b244e478ceaa" />
 
 ### Visual editor
-<img width="333" alt="Visual editor" src="https://github.com/user-attachments/assets/f5c514ca-761b-47e0-b696-06aec20d3ef3" />
+<img width="513" height="1173" alt="image" src="https://github.com/user-attachments/assets/d64ccabd-641c-4fbe-b437-85c71a8a93e4" />
+<img width="513" height="551" alt="image" src="https://github.com/user-attachments/assets/bcd6cd50-0965-4f3e-8444-c42f3b3a81cd" />
 
 
 ## Installation
