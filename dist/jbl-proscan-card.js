@@ -1,4 +1,4 @@
-const JBL_PROSCAN_CARD_VERSION = "1.4.6";
+const JBL_PROSCAN_CARD_VERSION = "1.2.0";
 
 const JBL_STRINGS = {
   fr: {
@@ -118,7 +118,7 @@ class JBLProScanCardEditor extends HTMLElement {
       const label = state.attributes.friendly_name || state.entity_id;
       return `<option value="${state.entity_id}" ${state.entity_id === this._config.entity ? "selected" : ""}>${label}</option>`;
     }).join("");
-    const count = Math.min(100, Math.max(2, Number(this._config.measurements ?? 20) || 20));
+    const count = Math.min(1000, Math.max(2, Number(this._config.measurements ?? 20) || 20));
     this.shadowRoot.innerHTML = `
       <style>
         :host{display:block;color:var(--primary-text-color)}
@@ -136,7 +136,7 @@ class JBLProScanCardEditor extends HTMLElement {
       <div class="grid">
         <label>${t(this._hass,"editor_entity")}<select id="entity"><option value=""></option>${options}</select></label>
         <label>${t(this._hass,"editor_title")}<input id="title" type="text" value="${this._config.title || ""}"></label>
-        <label>${t(this._hass,"editor_measurements")}<input id="measurements" type="number" inputmode="numeric" min="2" max="100" step="1" value="${count}"></label>
+        <label>${t(this._hass,"editor_measurements")}<input id="measurements" type="number" inputmode="numeric" min="2" max="1000" step="1" value="${count}"></label>
         <div class="two">
           <label>${t(this._hass,"editor_history_source")}<select id="history_source"><option value="auto" ${(this._config.history_source||"auto")==="auto"?"selected":""}>${t(this._hass,"source_auto")}</option><option value="jbl" ${this._config.history_source==="jbl"?"selected":""}>${t(this._hass,"source_jbl")}</option><option value="statistics" ${this._config.history_source==="statistics"?"selected":""}>${t(this._hass,"source_statistics")}</option></select></label>
           <label>${t(this._hass,"editor_statistics_days")}<input id="statistics_days" type="number" min="1" max="1825" step="1" value="${Number(this._config.statistics_days||365)}"></label>
@@ -171,7 +171,7 @@ class JBLProScanCardEditor extends HTMLElement {
     const listen = (id, event, fn) => this.shadowRoot.getElementById(id).addEventListener(event, e => this._emit(fn(e.target)));
     listen("entity", "change", el => ({ entity: el.value }));
     listen("title", "input", el => ({ title: el.value }));
-    listen("measurements", "change", el => ({ measurements: Math.min(100, Math.max(2, Number(el.value) || 20)) }));
+    listen("measurements", "change", el => ({ measurements: Math.min(1000, Math.max(2, Number(el.value) || 20)) }));
     listen("history_source", "change", el => ({ history_source: el.value }));
     listen("statistics_days", "change", el => ({ statistics_days: Math.min(1825, Math.max(1, Number(el.value) || 365)) }));
     listen("statistics_period", "change", el => ({ statistics_period: el.value }));
@@ -384,7 +384,7 @@ class JBLProScanCard extends HTMLElement {
   _statusText(status) { return t(this._hass,status); }
   _overall(statuses, age) { const all=[...statuses,age].filter(v=>v!=="neutral"); return all.includes("bad")?"bad":all.includes("warning")?"warning":all.length?"good":"neutral"; }
   _chart(history,key,status) {
-    const limit=Math.min(100,Math.max(2,Number(this.config.measurements ?? this.config.points)||20));
+    const limit=Math.min(1000,Math.max(2,Number(this.config.measurements ?? this.config.points)||20));
     const stats=this._statistics?.[key]||[];
     const mode=this.config.history_source||"auto";
     const jblRows=history.map(row=>({date:row.date,value:this._number(row[key]).value,source:"jbl"}));
@@ -392,7 +392,7 @@ class JBLProScanCard extends HTMLElement {
       : mode==="jbl" ? jblRows
       : this._autoRows(history,key,stats);
     const filtered=this._filterPeriod(sourceRows);
-    const rows=filtered.slice(-limit);
+    const rows=this._period === "all" ? filtered : filtered.slice(-limit);
     const useStats=mode==="statistics";
     const values=rows.map(r=>Number(r.value)); const valid=values.filter(Number.isFinite);
     if(valid.length<2)return `<div class="no-chart">${t(this._hass,"no_chart")}</div>`;
