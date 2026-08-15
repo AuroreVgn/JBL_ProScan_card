@@ -1,4 +1,4 @@
-const JBL_PROSCAN_CARD_VERSION = "1.1.0";
+const JBL_PROSCAN_CARD_VERSION = "1.4.6";
 
 const JBL_STRINGS = {
   fr: {
@@ -87,7 +87,14 @@ function t(hass, key, vars = {}) {
 
 class JBLProScanCardEditor extends HTMLElement {
   constructor() { super(); this.attachShadow({ mode: "open" }); }
-  set hass(value) { this._hass = value; this._render(); }
+  set hass(value) {
+    this._hass = value;
+    // Home Assistant updates `hass` frequently. Do not rebuild the editor
+    // while the user is typing, otherwise the focused native input is replaced.
+    const active = this.shadowRoot?.activeElement;
+    if (active && (active.matches?.("input, select, textarea") || active.closest?.("ha-selector"))) return;
+    this._render();
+  }
   setConfig(value) {
     this._config = { ...value };
     if (this._config.measurements == null && this._config.points != null) {
@@ -270,6 +277,33 @@ class JBLProScanCard extends HTMLElement {
     const days=this._periodDays(), cutoff=Date.now()-days*86400000;
     return rows.filter(row => { const time=new Date(row.date).getTime(); return Number.isFinite(time) && time>=cutoff; });
   }
+  _autoRows(history, key, stats) {
+    const jbl = history
+      .map(row => ({ date: row.date, value: this._number(row[key]).value, source: "jbl" }))
+      .filter(row => Number.isFinite(Number(row.value)) && Number.isFinite(new Date(row.date).getTime()))
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+    const statRows = (stats || [])
+      .filter(row => Number.isFinite(Number(row.value)) && Number.isFinite(new Date(row.date).getTime()))
+      .map(row => ({ ...row, source: "statistics" }))
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+
+    // Actual JBL analyses are the canonical points. Statistics are used to extend
+    // the timeline only when there is no JBL analysis for that UTC day.
+    const jblDays = new Set(jbl.map(row => new Date(row.date).toISOString().slice(0,10)));
+    const combined = [...jbl, ...statRows.filter(row => !jblDays.has(new Date(row.date).toISOString().slice(0,10)))]
+      .sort((a,b) => new Date(a.date) - new Date(b.date));
+
+    // Recorder daily statistics can repeat the same unchanged sensor state every
+    // day. Collapse those repetitions so the chart still represents analyses and
+    // meaningful changes instead of a flat point for every calendar day.
+    const result = [];
+    for (const row of combined) {
+      const previous = result[result.length - 1];
+      if (row.source === "statistics" && previous && Number(previous.value) === Number(row.value)) continue;
+      result.push(row);
+    }
+    return result;
+  }
   _comparison(history,key) {
     const valid=history.map(row=>({row,parsed:this._number(row[key])})).filter(x=>Number.isFinite(x.parsed.value));
     if(valid.length<2)return null;
@@ -352,10 +386,14 @@ class JBLProScanCard extends HTMLElement {
   _chart(history,key,status) {
     const limit=Math.min(100,Math.max(2,Number(this.config.measurements ?? this.config.points)||20));
     const stats=this._statistics?.[key]||[];
-    const useStats=this.config.history_source==="statistics"||(this.config.history_source==="auto"&&stats.length>=2);
-    const sourceRows=useStats?stats:history.map(row=>({date:row.date,value:this._number(row[key]).value}));
+    const mode=this.config.history_source||"auto";
+    const jblRows=history.map(row=>({date:row.date,value:this._number(row[key]).value,source:"jbl"}));
+    const sourceRows=mode==="statistics" ? stats.map(row=>({...row,source:"statistics"}))
+      : mode==="jbl" ? jblRows
+      : this._autoRows(history,key,stats);
     const filtered=this._filterPeriod(sourceRows);
-    const rows=useStats?filtered:filtered.slice(-limit);
+    const rows=filtered.slice(-limit);
+    const useStats=mode==="statistics";
     const values=rows.map(r=>Number(r.value)); const valid=values.filter(Number.isFinite);
     if(valid.length<2)return `<div class="no-chart">${t(this._hass,"no_chart")}</div>`;
     const def=this._defs()[key]; const range=this.config.show_recommended===false?null:def?.range;
@@ -389,11 +427,42 @@ class JBLProScanCard extends HTMLElement {
         let text=""; try{text=decodeURIComponent(hit.dataset.tip||"");}catch(_){text=hit.dataset.tip||"";}
         tooltip.innerHTML=text;
         const rect=chart.getBoundingClientRect();
-        const clientX=event.clientX ?? (event.touches?.[0]?.clientX);
-        const clientY=event.clientY ?? (event.touches?.[0]?.clientY);
-        const x=Math.max(8,Math.min(rect.width-8,(clientX||rect.left+rect.width/2)-rect.left));
-        const y=Math.max(8,(clientY||rect.top+40)-rect.top);
-        tooltip.style.left=`${x}px`; tooltip.style.top=`${y}px`; tooltip.classList.add("visible");
+        const clientX=event.clientX ?? (event.touches?.[0]?.clientX) ?? (rect.left+rect.width/2);
+        const clientY=event.clientY ?? (event.touches?.[0]?.clientY) ?? (rect.top+rect.height/2);
+        const pointX=Math.max(0,Math.min(rect.width,clientX-rect.left));
+        const pointY=Math.max(0,Math.min(rect.height,clientY-rect.top));
+
+        // Measure the tooltip first, then clamp it inside the chart/card.
+        tooltip.classList.add("measuring");
+        tooltip.classList.add("visible");
+        const tipWidth=Math.min(tooltip.offsetWidth,Math.max(0,rect.width-16));
+        const tipHeight=tooltip.offsetHeight;
+        const margin=8;
+
+        let left;
+        if(rect.width<=520){
+          left=(rect.width-tipWidth)/2;
+        }else if(pointX<rect.width/2){
+          left=Math.min(pointX+16,rect.width-tipWidth-margin);
+        }else{
+          left=Math.max(margin,pointX-tipWidth-16);
+        }
+        left=Math.max(margin,Math.min(rect.width-tipWidth-margin,left));
+
+        let top;
+        const above=pointY-tipHeight-14;
+        const below=pointY+14;
+        if(above>=margin){
+          top=above;
+        }else if(below+tipHeight<=rect.height-margin){
+          top=below;
+        }else{
+          top=Math.max(margin,Math.min(rect.height-tipHeight-margin,(rect.height-tipHeight)/2));
+        }
+
+        tooltip.style.left=`${left}px`;
+        tooltip.style.top=`${top}px`;
+        tooltip.classList.remove("measuring");
       };
       hit.addEventListener("pointerenter",showTooltip);
       hit.addEventListener("pointermove",showTooltip);
@@ -437,7 +506,7 @@ class JBLProScanCard extends HTMLElement {
         .header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px 14px}.identity{display:flex;align-items:center;gap:16px;min-width:0}.hero{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}.hero ha-icon{--mdc-icon-size:34px}.title{min-width:0}.title h2{font-size:1.75rem;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.title p{font-size:1.08rem;color:var(--secondary-text-color);margin:4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:flex;align-items:center;gap:9px;padding:10px 15px;border-radius:999px;background:var(--secondary-background-color);font-size:1.05rem;font-weight:700;white-space:nowrap}.badge::before{content:"";width:11px;height:11px;border-radius:50%;background:var(--neutral)}.badge.st-good::before{background:var(--good)}.badge.st-warning::before{background:var(--warning)}.badge.st-bad::before{background:var(--bad)}.header-actions{display:flex;align-items:center;gap:10px}.refresh{appearance:none;border:0;border-radius:50%;width:50px;height:50px;display:grid;place-items:center;background:var(--secondary-background-color);color:var(--accent);cursor:pointer}.refresh:hover{background:color-mix(in srgb,var(--accent) 12%,var(--secondary-background-color))}.refresh:disabled{opacity:.55;cursor:wait}.refresh.loading ha-icon{animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
         .meta{display:flex;gap:10px;padding:0 24px 18px;overflow:hidden}.chip{display:flex;align-items:center;gap:9px;min-width:0;padding:10px 14px;border-radius:12px;background:var(--secondary-background-color);font-size:1rem}.chip ha-icon{color:var(--accent);--mdc-icon-size:24px}.chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chip.age.st-warning,.chip.age.st-bad{color:var(--warning)}.chip.age.st-bad{color:var(--bad)}
         .section-label{padding:0 24px 12px;color:var(--secondary-text-color);font-size:1rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:0 24px 20px}.metrics:has(.metric:nth-child(6):last-child) .metric:nth-child(5){grid-column:2}.metric{appearance:none;border:1px solid transparent;background:var(--secondary-background-color);color:var(--primary-text-color);border-radius:20px;padding:16px;text-align:left;min-width:0;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}.metric:hover{transform:translateY(-1px)}.metric.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--secondary-background-color))}.metric-top{display:flex;align-items:center;gap:10px}.metric-top ha-icon{--mdc-icon-size:28px;color:var(--accent)}.metric-name{font-size:1.12rem;font-weight:700;overflow:hidden;text-overflow:ellipsis}.metric-top i{margin-left:auto;width:11px;height:11px;border-radius:50%;background:var(--neutral)}.metric.st-good i{background:var(--good)}.metric.st-warning i{background:var(--warning)}.metric.st-bad i{background:var(--bad)}.metric-reading{display:flex;align-items:baseline;gap:4px;margin-top:12px;white-space:nowrap}.metric-reading strong{font-size:2.15rem;font-weight:500}.metric-reading small{font-size:1rem;color:var(--secondary-text-color)}.metric-status{display:block;margin-top:7px;font-size:1rem;color:var(--secondary-text-color)}.metric.st-good .metric-status{color:var(--good)}.metric.st-warning .metric-status{color:var(--warning)}.metric.st-bad .metric-status{color:var(--bad)}.metric-delta{display:block;margin-top:7px;font-size:.96rem;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric-delta.up{color:var(--warning)}.metric-delta.down{color:var(--accent)}
-        .periods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 24px 16px;padding:6px;border-radius:18px;background:var(--secondary-background-color)}.period{appearance:none;border:0;border-radius:10px;min-height:48px;padding:10px 14px;background:transparent;color:var(--secondary-text-color);font-size:1.05rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s}.period:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}.period.active{background:var(--card-background-color);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.14)}.detail{margin:0 24px 20px;padding:20px;border-radius:20px;background:var(--secondary-background-color)}.detail-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.detail-title{display:flex;align-items:center;gap:12px}.detail-title ha-icon{color:var(--accent)}.detail-title h3{font-size:1.45rem;margin:0;font-weight:600}.detail-value{display:flex;align-items:baseline;gap:5px}.detail-value strong{font-size:2.5rem;font-weight:500}.detail-value small{color:var(--secondary-text-color);font-size:1.2rem}.chart{position:relative;margin-top:18px}.chart-svg{width:100%;height:220px;display:block;color:var(--neutral);overflow:visible}.chart-svg.s-good{color:var(--good)}.chart-svg.s-warning{color:var(--warning)}.chart-svg.s-bad{color:var(--bad)}.chart-svg .range .recommended{fill:color-mix(in srgb,var(--good) 16%,transparent);stroke:color-mix(in srgb,var(--good) 55%,transparent);stroke-width:1;stroke-dasharray:5 4}.chart-svg .grid line{stroke:var(--divider-color);stroke-width:1}.chart-svg .area polygon{fill:url(#jblFill)}.chart-svg .line polyline{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.chart-svg .line circle{fill:currentColor;stroke:var(--card-background-color);stroke-width:2}.chart-svg .line .hit{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}.chart-svg .line .last{stroke-width:3}.axis{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:10px;color:var(--secondary-text-color);font-size:1rem;line-height:1.4;margin-top:10px}.axis span:nth-child(2){text-align:center;font-weight:500}.axis span:last-child{text-align:right}.chart-tooltip{position:absolute;z-index:5;max-width:min(400px,92%);transform:translate(-50%,calc(-100% - 14px));padding:20px 22px;border-radius:14px;background:var(--card-background-color);color:var(--primary-text-color);box-shadow:0 6px 22px rgba(0,0,0,.3);font-size:1.15rem;line-height:1.55;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s}.tt-date{font-size:1.05rem;font-weight:600;color:var(--secondary-text-color);margin-bottom:10px}.tt-label{font-size:.95rem;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;letter-spacing:.035em;margin-top:8px}.tt-value{font-size:2rem;font-weight:700;line-height:1.2;margin-top:2px}.tt-change{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:3px;font-size:1.15rem}.tt-change strong{font-size:1.35rem}.tt-change span{color:var(--secondary-text-color);font-size:1.05rem}.tt-change.up strong{color:var(--warning)}.tt-change.down strong{color:var(--accent)}.tt-change.stable strong{color:var(--secondary-text-color)}.tt-stats{display:grid;gap:3px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range{display:flex;justify-content:space-between;gap:12px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range span{color:var(--secondary-text-color)}.tt-range strong{white-space:nowrap}.chart-tooltip.visible{opacity:1;visibility:visible}.chart-tooltip::after{content:"";position:absolute;left:50%;bottom:-6px;transform:translateX(-50%);border:6px solid transparent;border-top-color:var(--card-background-color);border-bottom:0}.no-chart{height:160px;display:grid;place-items:center;color:var(--secondary-text-color);font-size:1rem}
+        .periods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 24px 16px;padding:6px;border-radius:18px;background:var(--secondary-background-color)}.period{appearance:none;border:0;border-radius:10px;min-height:48px;padding:10px 14px;background:transparent;color:var(--secondary-text-color);font-size:1.05rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s}.period:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}.period.active{background:var(--card-background-color);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.14)}.detail{margin:0 24px 20px;padding:20px;border-radius:20px;background:var(--secondary-background-color)}.detail-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.detail-title{display:flex;align-items:center;gap:12px}.detail-title ha-icon{color:var(--accent)}.detail-title h3{font-size:1.45rem;margin:0;font-weight:600}.detail-value{display:flex;align-items:baseline;gap:5px}.detail-value strong{font-size:2.5rem;font-weight:500}.detail-value small{color:var(--secondary-text-color);font-size:1.2rem}.chart{position:relative;margin-top:18px}.chart-svg{width:100%;height:220px;display:block;color:var(--neutral);overflow:visible}.chart-svg.s-good{color:var(--good)}.chart-svg.s-warning{color:var(--warning)}.chart-svg.s-bad{color:var(--bad)}.chart-svg .range .recommended{fill:color-mix(in srgb,var(--good) 16%,transparent);stroke:color-mix(in srgb,var(--good) 55%,transparent);stroke-width:1;stroke-dasharray:5 4}.chart-svg .grid line{stroke:var(--divider-color);stroke-width:1}.chart-svg .area polygon{fill:url(#jblFill)}.chart-svg .line polyline{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.chart-svg .line circle{fill:currentColor;stroke:var(--card-background-color);stroke-width:2}.chart-svg .line .hit{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}.chart-svg .line .last{stroke-width:3}.axis{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:10px;color:var(--secondary-text-color);font-size:1rem;line-height:1.4;margin-top:10px}.axis span:nth-child(2){text-align:center;font-weight:500}.axis span:last-child{text-align:right}.chart-tooltip{position:absolute;z-index:20;width:min(340px,calc(100% - 16px));max-width:calc(100% - 16px);transform:none;padding:18px 20px;border:1px solid color-mix(in srgb,var(--divider-color) 70%,transparent);border-radius:16px;background:color-mix(in srgb,var(--card-background-color) 96%,transparent);color:var(--primary-text-color);box-shadow:0 8px 28px rgba(0,0,0,.32);font-size:1.15rem;line-height:1.5;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s;overflow-wrap:anywhere}.chart-tooltip.measuring{opacity:0!important;visibility:hidden!important;transition:none!important}.tt-date{font-size:1.05rem;font-weight:600;color:var(--secondary-text-color);margin-bottom:10px}.tt-label{font-size:.95rem;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;letter-spacing:.035em;margin-top:8px}.tt-value{font-size:2rem;font-weight:700;line-height:1.2;margin-top:2px}.tt-change{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:3px;font-size:1.15rem}.tt-change strong{font-size:1.35rem}.tt-change span{color:var(--secondary-text-color);font-size:1.05rem}.tt-change.up strong{color:var(--warning)}.tt-change.down strong{color:var(--accent)}.tt-change.stable strong{color:var(--secondary-text-color)}.tt-stats{display:grid;gap:3px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range{display:flex;justify-content:space-between;gap:12px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range span{color:var(--secondary-text-color)}.tt-range strong{white-space:nowrap}.chart-tooltip.visible{opacity:1;visibility:visible}.chart-tooltip::after{display:none}.no-chart{height:160px;display:grid;place-items:center;color:var(--secondary-text-color);font-size:1rem}
          .footer{display:flex;justify-content:space-between;gap:12px;padding:12px 24px 16px;border-top:1px solid var(--divider-color);font-size:.82rem;color:var(--secondary-text-color)}.versions{white-space:nowrap}
         ha-card.compact .header{padding-bottom:8px}ha-card.compact .meta{display:none}ha-card.compact .section-label{display:none}ha-card.compact .metrics{padding-top:2px}.compact .detail{padding:10px}.compact .chart-svg{height:110px}.compact .footer span:first-child{display:none}
         @container (max-width:700px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.metrics:has(.metric:nth-child(6):last-child) .metric:nth-child(5){grid-column:auto}}
