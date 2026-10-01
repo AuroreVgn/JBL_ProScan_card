@@ -1,4 +1,4 @@
-const JBL_PROSCAN_CARD_VERSION = "1.2.0";
+const JBL_PROSCAN_CARD_VERSION = "1.3.8";
 
 const JBL_STRINGS = {
   fr: {
@@ -106,7 +106,7 @@ class JBLProScanCardEditor extends HTMLElement {
     this._config = { ...this._config, ...patch };
     delete this._config.points;
     this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: this._config }, bubbles: true, composed: true
+      detail: { config: (() => { const config = { ...this._config }; delete config.grid_options; return config; })() }, bubbles: true, composed: true
     }));
   }
   _render() {
@@ -239,9 +239,32 @@ class JBLProScanCard extends HTMLElement {
     this.config = { title:null,measurements:20,history_source:"auto",statistics_days:365,statistics_period:"day",show_recommended:true,show_co2:true,show_units:true,show_refresh:true,compact:false,stale_warning_days:14,stale_critical_days:30,colors:{},icons:{},ranges:{},...config };
     if (this.config.measurements == null && this.config.points != null) this.config.measurements = this.config.points;
   }
-  set hass(value) { this._hass = value; this._render(); this._maybeLoadStatistics(this._selected); }
+  set hass(value) {
+    const previousHass = this._hass;
+    this._hass = value;
+
+    // Home Assistant replaces `hass` very frequently, even when this card's
+    // entity did not change. Rebuilding the whole shadow DOM on every update
+    // can make Safari/iOS move the dashboard scroll position. Only rerender
+    // when the JBL history entity itself changed (or on the initial render).
+    const entityId = this.config?.entity;
+    const previousState = entityId ? previousHass?.states?.[entityId] : undefined;
+    const currentState = entityId ? value?.states?.[entityId] : undefined;
+    const shouldRender = !previousHass || previousState !== currentState || !this.shadowRoot?.firstChild;
+    if (!shouldRender) return;
+
+    this._render();
+    this._maybeLoadStatistics(this._selected);
+  }
   getCardSize() { return this.config?.compact ? 8 : 12; }
-  getGridOptions() { return { columns:12, rows:this.config?.compact ? 10 : 15, min_columns:4, min_rows:this.config?.compact ? 8 : 12 }; }
+  getGridOptions() {
+    // No rows/min_rows: let Home Assistant size the card from its content.
+    return {
+      columns: 12,
+      min_columns: 4
+    };
+  }
+
   _escape(value) { return String(value ?? "").replace(/[&<>\"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
   _number(raw) { const m=String(raw??"").trim().replace(",",".").match(/^\s*([<>]=?)?\s*(-?\d+(?:\.\d+)?)/); return m?{value:Number(m[2]),comparator:m[1]||""}:{value:null,comparator:""}; }
   _locale() { return this._hass?.locale?.language || navigator.language || "en"; }
@@ -279,7 +302,7 @@ class JBLProScanCard extends HTMLElement {
   }
   _autoRows(history, key, stats) {
     const jbl = history
-      .map(row => ({ date: row.date, value: this._number(row[key]).value, source: "jbl" }))
+      .map(row => { const parsed=this._number(row[key]); return { date: row.date, value: parsed.value, comparator: parsed.comparator, source: "jbl" }; })
       .filter(row => Number.isFinite(Number(row.value)) && Number.isFinite(new Date(row.date).getTime()))
       .sort((a,b) => new Date(a.date) - new Date(b.date));
     const statRows = (stats || [])
@@ -372,13 +395,13 @@ class JBLProScanCard extends HTMLElement {
   }
   _defs() {
     return {
-      ph:{label:"pH",unit:"",icon:this._icon("ph","mdi:ph"),range:this._range("ph",[6.5,8.5]),status:x=>x.value===null?"neutral":x.value>=6.5&&x.value<=8.5?"good":x.value>=6&&x.value<=9?"warning":"bad"},
-      kh:{label:"KH",unit:"°dKH",icon:this._icon("kh","mdi:water-outline"),range:this._range("kh",[5,15]),status:x=>x.value===null?"neutral":x.value>=5&&x.value<=15?"good":x.value>=3&&x.value<=20?"warning":"bad"},
-      gh:{label:"GH",unit:"°dGH",icon:this._icon("gh","mdi:water-opacity"),range:this._range("gh",[4,21]),status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=21?"warning":x.value>=4&&x.value<=21?"good":x.value>=2&&x.value<=28?"warning":"bad"},
-      no2:{label:"NO₂",unit:"mg/L",icon:this._icon("no2","mdi:alert-decagram-outline"),range:this._range("no2",[0,0.25]),status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=.25?"bad":x.value===0?"good":x.value<=.25?"warning":"bad"},
-      no3:{label:"NO₃",unit:"mg/L",icon:this._icon("no3","mdi:leaf-circle-outline"),range:this._range("no3",[0,25]),status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=50?"bad":x.value<=25?"good":x.value<=50?"warning":"bad"},
+      ph:{label:"pH",unit:"",icon:this._icon("ph","mdi:ph"),range:this._range("ph",[6.5,8.5]),warningRange:[6,9],status:x=>x.value===null?"neutral":x.value>=6.5&&x.value<=8.5?"good":x.value>=6&&x.value<=9?"warning":"bad"},
+      kh:{label:"KH",unit:"°dKH",icon:this._icon("kh","mdi:water-outline"),range:this._range("kh",[5,15]),warningRange:[3,20],status:x=>x.value===null?"neutral":x.value>=5&&x.value<=15?"good":x.value>=3&&x.value<=20?"warning":"bad"},
+      gh:{label:"GH",unit:"°dGH",icon:this._icon("gh","mdi:water-opacity"),range:this._range("gh",[4,21]),warningRange:[2,28],status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=21?"warning":x.value>=4&&x.value<=21?"good":x.value>=2&&x.value<=28?"warning":"bad"},
+      no2:{label:"NO₂",unit:"mg/L",icon:this._icon("no2","mdi:alert-decagram-outline"),range:this._range("no2",[0,0.25]),warningRange:[0,0.25],status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=.25?"bad":x.value>=0&&x.value<=.25?"good":"bad"},
+      no3:{label:"NO₃",unit:"mg/L",icon:this._icon("no3","mdi:leaf-circle-outline"),range:this._range("no3",[0,25]),warningRange:[0,50],status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=50?"bad":x.value<=25?"good":x.value<=50?"warning":"bad"},
       co2:{label:"CO₂",unit:"mg/L",icon:this._icon("co2","mdi:molecule-co2"),status:()=>"neutral"},
-      chlorine:{label:t(this._hass,"chlorine"),unit:"mg/L",icon:this._icon("chlorine","mdi:flask-outline"),range:this._range("chlorine",[0,0.8]),status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=.8?"bad":x.value===0?"good":x.value<=.8?"warning":"bad"}
+      chlorine:{label:t(this._hass,"chlorine"),unit:"mg/L",icon:this._icon("chlorine","mdi:flask-outline"),range:this._range("chlorine",[0,0.8]),warningRange:[0,0.8],status:x=>x.value===null?"neutral":x.comparator.startsWith(">")&&x.value>=.8?"bad":x.value>=0&&x.value<=.8?"good":"bad"}
     };
   }
   _statusText(status) { return t(this._hass,status); }
@@ -387,7 +410,7 @@ class JBLProScanCard extends HTMLElement {
     const limit=Math.min(1000,Math.max(2,Number(this.config.measurements ?? this.config.points)||20));
     const stats=this._statistics?.[key]||[];
     const mode=this.config.history_source||"auto";
-    const jblRows=history.map(row=>({date:row.date,value:this._number(row[key]).value,source:"jbl"}));
+    const jblRows=history.map(row=>{const parsed=this._number(row[key]);return{date:row.date,value:parsed.value,comparator:parsed.comparator,source:"jbl"};});
     const sourceRows=mode==="statistics" ? stats.map(row=>({...row,source:"statistics"}))
       : mode==="jbl" ? jblRows
       : this._autoRows(history,key,stats);
@@ -397,23 +420,57 @@ class JBLProScanCard extends HTMLElement {
     const values=rows.map(r=>Number(r.value)); const valid=values.filter(Number.isFinite);
     if(valid.length<2)return `<div class="no-chart">${t(this._hass,"no_chart")}</div>`;
     const def=this._defs()[key]; const range=this.config.show_recommended===false?null:def?.range;
-    let min=Math.min(...valid,...(range||[])),max=Math.max(...valid,...(range||[])); if(min===max){min-=.5;max+=.5;}
-    const pad=(max-min)*.08||.5; min-=pad; max+=pad;
+    const warningRange=this.config.show_recommended===false?null:def?.warningRange;
+    const scaleValues=[...valid,...(range||[]),...(warningRange||[])];
+    let min=Math.min(...scaleValues),max=Math.max(...scaleValues); if(min===max){min-=.5;max+=.5;}
+    // Keep some visible space beyond the outer thresholds so red zones are visible
+    // even when all recorded measurements are currently inside the recommended range.
+    const span=max-min||1;
+    const pad=Math.max(span*.10, key==="no2"?.05:key==="chlorine"?.12:.5); min-=pad; max+=pad;
+    if((key==="no2"||key==="no3"||key==="chlorine")&&min<0)min=0;
     const W=600,H=this.config.compact?120:160,px=12,py=14;
     const x=i=>px+i*(W-2*px)/Math.max(1,rows.length-1); const y=v=>py+(max-v)*(H-2*py)/(max-min);
     const points=values.map((v,i)=>Number.isFinite(v)?`${x(i).toFixed(1)},${y(v).toFixed(1)}`:null).filter(Boolean);
     const area=points.length?`<polygon points="${px},${H-py} ${points.join(" ")} ${W-px},${H-py}"/>`:"";
+    const severity={neutral:0,good:1,warning:2,bad:3};
+    const rowStatus=row=>def.status({value:Number(row.value),comparator:row.comparator||""});
+    const segments=[];
+    for(let i=1;i<rows.length;i++){
+      const a=Number(rows[i-1].value),b=Number(rows[i].value);
+      if(!Number.isFinite(a)||!Number.isFinite(b))continue;
+      const sa=rowStatus(rows[i-1]),sb=rowStatus(rows[i]);
+      const segmentStatus=(severity[sb]??0)>(severity[sa]??0)?sb:sa;
+      segments.push(`<line class="segment st-${segmentStatus}" x1="${x(i-1)}" y1="${y(a)}" x2="${x(i)}" y2="${y(b)}"></line>`);
+    }
     const pointDots=rows.map((row,i)=>{
       if(!Number.isFinite(Number(row.value)))return "";
       const previous=i>0?Number(rows[i-1].value):null;
       const tip=encodeURIComponent(this._tooltip(row,def,previous));
-      return `<circle class="point" cx="${x(i)}" cy="${y(Number(row.value))}" r="4"></circle><circle class="hit" data-tip="${tip}" cx="${x(i)}" cy="${y(Number(row.value))}" r="15"></circle>`;
+      const pointStatus=rowStatus(row);
+      return `<circle class="point st-${pointStatus}" cx="${x(i)}" cy="${y(Number(row.value))}" r="4"></circle><circle class="hit" data-tip="${tip}" cx="${x(i)}" cy="${y(Number(row.value))}" r="15"></circle>`;
     }).join("");
-    const lastIndex=values.map(Number.isFinite).lastIndexOf(true); const dot=lastIndex>=0?`<circle class="last" cx="${x(lastIndex)}" cy="${y(values[lastIndex])}" r="5"/>`:"";
-    const band=range?`<rect class="recommended" x="${px}" y="${Math.min(y(range[0]),y(range[1]))}" width="${W-2*px}" height="${Math.abs(y(range[0])-y(range[1]))}"/>`:"";
+    const lastIndex=values.map(Number.isFinite).lastIndexOf(true); const dot=lastIndex>=0?`<circle class="last st-${rowStatus(rows[lastIndex])}" cx="${x(lastIndex)}" cy="${y(values[lastIndex])}" r="5"/>`:"";
+    const zoneRect=(from,to,cls)=>{
+      const lo=Math.max(min,Math.min(from,to)),hi=Math.min(max,Math.max(from,to));
+      if(!(hi>lo))return "";
+      return `<rect class="quality-zone ${cls}" x="${px}" y="${Math.min(y(lo),y(hi))}" width="${W-2*px}" height="${Math.abs(y(lo)-y(hi))}"/>`;
+    };
+    let bands="";
+    if(range){
+      const goodLo=range[0],goodHi=range[1];
+      const warnLo=warningRange?.[0]??goodLo,warnHi=warningRange?.[1]??goodHi;
+      // Paint from worst to best so exact threshold boundaries visually belong
+      // to the recommended (green) band. NO2 and chlorine intentionally have
+      // no orange interval because their warning range equals their good range.
+      bands+=zoneRect(min,warnLo,"bad");
+      bands+=zoneRect(warnLo,goodLo,"warning");
+      bands+=zoneRect(goodLo,goodHi,"good");
+      bands+=zoneRect(goodHi,warnHi,"warning");
+      bands+=zoneRect(warnHi,max,"bad");
+    }
     const firstDate=rows.find(r=>Number.isFinite(Number(r.value)))?.date; const lastDate=[...rows].reverse().find(r=>Number.isFinite(Number(r.value)))?.date;
     const middle=range?`${t(this._hass,"recommended_range")}: ${range[0]}–${range[1]} ${this._unit(def)}`:(useStats?t(this._hass,"statistics_source"):t(this._hass,"measurements_shown",{count:valid.length}));
-    return `<div class="chart"><div class="chart-tooltip" role="tooltip"></div><svg class="chart-svg s-${status}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="jblFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".22"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><g class="range">${band}</g><g class="grid"><line x1="12" y1="${H*.33}" x2="588" y2="${H*.33}"/><line x1="12" y1="${H*.66}" x2="588" y2="${H*.66}"/></g><g class="area">${area}</g><g class="line"><polyline points="${points.join(" ")}"/>${pointDots}${dot}</g></svg><div class="axis"><span>${this._date(firstDate,true)}</span><span>${middle}</span><span>${this._date(lastDate,true)}</span></div></div>`;
+    return `<div class="chart"><div class="chart-tooltip" role="tooltip"></div><svg class="chart-svg s-${status}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="jblFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="currentColor" stop-opacity=".22"/><stop offset="1" stop-color="currentColor" stop-opacity="0"/></linearGradient></defs><g class="range">${bands}</g><g class="grid"><line x1="12" y1="${H*.33}" x2="588" y2="${H*.33}"/><line x1="12" y1="${H*.66}" x2="588" y2="${H*.66}"/></g><g class="area">${area}</g><g class="line"><g class="segments">${segments.join("")}</g>${pointDots}${dot}</g></svg><div class="axis"><span>${this._date(firstDate,true)}</span><span>${middle}</span><span>${this._date(lastDate,true)}</span></div></div>`;
   }
   _bind() {
     this.shadowRoot.querySelectorAll("button.metric").forEach(button=>button.addEventListener("click",()=>{this._selected=button.dataset.key;this._render();this._maybeLoadStatistics(this._selected);}));
@@ -483,7 +540,73 @@ class JBLProScanCard extends HTMLElement {
       } finally { this._refreshing=false;this._render(); }
     });
   }
+  _scrollSnapshot() {
+    const positions = [];
+    const seen = new Set();
+
+    const remember = (el) => {
+      if (!el || seen.has(el)) return;
+      seen.add(el);
+      const top = Number(el.scrollTop || 0);
+      const left = Number(el.scrollLeft || 0);
+      if (top || left) positions.push({ el, top, left });
+    };
+
+    // Browser/document scrolling.
+    remember(document.scrollingElement);
+    remember(document.documentElement);
+    remember(document.body);
+
+    // Walk through Home Assistant's nested light/shadow DOM hosts. Sections
+    // dashboards can be inside ha-scrollbar or another scroll container.
+    let node = this;
+    while (node) {
+      remember(node);
+      let parent = node.parentElement;
+      if (parent) {
+        node = parent;
+        continue;
+      }
+      const root = node.getRootNode?.();
+      node = root?.host || null;
+    }
+
+    return {
+      positions,
+      windowX: window.scrollX || 0,
+      windowY: window.scrollY || 0
+    };
+  }
+
+  _restoreScroll(snapshot) {
+    if (!snapshot) return;
+
+    const restore = () => {
+      for (const item of snapshot.positions) {
+        if (!item.el?.isConnected) continue;
+        if (item.el.scrollTop !== item.top) item.el.scrollTop = item.top;
+        if (item.el.scrollLeft !== item.left) item.el.scrollLeft = item.left;
+      }
+
+      // Safari/iOS may use the window scroll rather than document.scrollTop.
+      if ((window.scrollY || 0) !== snapshot.windowY ||
+          (window.scrollX || 0) !== snapshot.windowX) {
+        window.scrollTo(snapshot.windowX, snapshot.windowY);
+      }
+    };
+
+    // Restore immediately and once more after WebKit has completed layout.
+    restore();
+    requestAnimationFrame(() => restore());
+  }
+
   _render() {
+    const snapshot = this._scrollSnapshot();
+    this._renderContent();
+    this._restoreScroll(snapshot);
+  }
+
+  _renderContent() {
     if(!this._hass||!this.config)return;
     const state=this._hass.states[this.config.entity];
     if(!state){this.shadowRoot.innerHTML=`<ha-card><div class="message"><ha-icon icon="mdi:alert-circle-outline"></ha-icon>${t(this._hass,"entity_missing")}: ${this._escape(this.config.entity)}</div></ha-card>`;return;}
@@ -500,13 +623,13 @@ class JBLProScanCard extends HTMLElement {
     const integrationVersion=state.attributes.integration_version||"—";
     this.shadowRoot.innerHTML=`
       <style>
-        :host{display:block;container-type:inline-size;--accent:${this._color("accent","#0397c5")};--good:${this._color("good","#43a047")};--warning:${this._color("warning","#f9a825")};--bad:${this._color("bad","#e53935")};--neutral:var(--secondary-text-color,#757575)}
-        *{box-sizing:border-box}ha-card{overflow:hidden;color:var(--primary-text-color);background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,18px)}
+        :host{display:block;position:relative;isolation:isolate;contain:layout paint style;overflow:hidden;container-type:inline-size;--accent:${this._color("accent","#0397c5")};--good:${this._color("good","#43a047")};--warning:${this._color("warning","#f9a825")};--bad:${this._color("bad","#e53935")};--neutral:var(--secondary-text-color,#757575)}
+        *{box-sizing:border-box}ha-card{position:relative;isolation:isolate;contain:layout paint;overflow:hidden;color:var(--primary-text-color);background:var(--ha-card-background,var(--card-background-color));border-radius:var(--ha-card-border-radius,18px)}
         .message{display:flex;align-items:center;gap:10px;padding:20px;color:var(--secondary-text-color)}
         .header{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:22px 24px 14px}.identity{display:flex;align-items:center;gap:16px;min-width:0}.hero{width:58px;height:58px;border-radius:50%;display:grid;place-items:center;flex:none;color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}.hero ha-icon{--mdc-icon-size:34px}.title{min-width:0}.title h2{font-size:1.75rem;font-weight:600;margin:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.title p{font-size:1.08rem;color:var(--secondary-text-color);margin:4px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:flex;align-items:center;gap:9px;padding:10px 15px;border-radius:999px;background:var(--secondary-background-color);font-size:1.05rem;font-weight:700;white-space:nowrap}.badge::before{content:"";width:11px;height:11px;border-radius:50%;background:var(--neutral)}.badge.st-good::before{background:var(--good)}.badge.st-warning::before{background:var(--warning)}.badge.st-bad::before{background:var(--bad)}.header-actions{display:flex;align-items:center;gap:10px}.refresh{appearance:none;border:0;border-radius:50%;width:50px;height:50px;display:grid;place-items:center;background:var(--secondary-background-color);color:var(--accent);cursor:pointer}.refresh:hover{background:color-mix(in srgb,var(--accent) 12%,var(--secondary-background-color))}.refresh:disabled{opacity:.55;cursor:wait}.refresh.loading ha-icon{animation:spin .9s linear infinite}@keyframes spin{to{transform:rotate(360deg)}}
         .meta{display:flex;gap:10px;padding:0 24px 18px;overflow:hidden}.chip{display:flex;align-items:center;gap:9px;min-width:0;padding:10px 14px;border-radius:12px;background:var(--secondary-background-color);font-size:1rem}.chip ha-icon{color:var(--accent);--mdc-icon-size:24px}.chip span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.chip.age.st-warning,.chip.age.st-bad{color:var(--warning)}.chip.age.st-bad{color:var(--bad)}
         .section-label{padding:0 24px 12px;color:var(--secondary-text-color);font-size:1rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;padding:0 24px 20px}.metrics:has(.metric:nth-child(6):last-child) .metric:nth-child(5){grid-column:2}.metric{appearance:none;border:1px solid transparent;background:var(--secondary-background-color);color:var(--primary-text-color);border-radius:20px;padding:16px;text-align:left;min-width:0;cursor:pointer;transition:transform .15s,border-color .15s,background .15s}.metric:hover{transform:translateY(-1px)}.metric.selected{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 8%,var(--secondary-background-color))}.metric-top{display:flex;align-items:center;gap:10px}.metric-top ha-icon{--mdc-icon-size:28px;color:var(--accent)}.metric-name{font-size:1.12rem;font-weight:700;overflow:hidden;text-overflow:ellipsis}.metric-top i{margin-left:auto;width:11px;height:11px;border-radius:50%;background:var(--neutral)}.metric.st-good i{background:var(--good)}.metric.st-warning i{background:var(--warning)}.metric.st-bad i{background:var(--bad)}.metric-reading{display:flex;align-items:baseline;gap:4px;margin-top:12px;white-space:nowrap}.metric-reading strong{font-size:2.15rem;font-weight:500}.metric-reading small{font-size:1rem;color:var(--secondary-text-color)}.metric-status{display:block;margin-top:7px;font-size:1rem;color:var(--secondary-text-color)}.metric.st-good .metric-status{color:var(--good)}.metric.st-warning .metric-status{color:var(--warning)}.metric.st-bad .metric-status{color:var(--bad)}.metric-delta{display:block;margin-top:7px;font-size:.96rem;color:var(--secondary-text-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.metric-delta.up{color:var(--warning)}.metric-delta.down{color:var(--accent)}
-        .periods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 24px 16px;padding:6px;border-radius:18px;background:var(--secondary-background-color)}.period{appearance:none;border:0;border-radius:10px;min-height:48px;padding:10px 14px;background:transparent;color:var(--secondary-text-color);font-size:1.05rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s}.period:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}.period.active{background:var(--card-background-color);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.14)}.detail{margin:0 24px 20px;padding:20px;border-radius:20px;background:var(--secondary-background-color)}.detail-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.detail-title{display:flex;align-items:center;gap:12px}.detail-title ha-icon{color:var(--accent)}.detail-title h3{font-size:1.45rem;margin:0;font-weight:600}.detail-value{display:flex;align-items:baseline;gap:5px}.detail-value strong{font-size:2.5rem;font-weight:500}.detail-value small{color:var(--secondary-text-color);font-size:1.2rem}.chart{position:relative;margin-top:18px}.chart-svg{width:100%;height:220px;display:block;color:var(--neutral);overflow:visible}.chart-svg.s-good{color:var(--good)}.chart-svg.s-warning{color:var(--warning)}.chart-svg.s-bad{color:var(--bad)}.chart-svg .range .recommended{fill:color-mix(in srgb,var(--good) 16%,transparent);stroke:color-mix(in srgb,var(--good) 55%,transparent);stroke-width:1;stroke-dasharray:5 4}.chart-svg .grid line{stroke:var(--divider-color);stroke-width:1}.chart-svg .area polygon{fill:url(#jblFill)}.chart-svg .line polyline{fill:none;stroke:currentColor;stroke-width:3;stroke-linecap:round;stroke-linejoin:round}.chart-svg .line circle{fill:currentColor;stroke:var(--card-background-color);stroke-width:2}.chart-svg .line .hit{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}.chart-svg .line .last{stroke-width:3}.axis{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:10px;color:var(--secondary-text-color);font-size:1rem;line-height:1.4;margin-top:10px}.axis span:nth-child(2){text-align:center;font-weight:500}.axis span:last-child{text-align:right}.chart-tooltip{position:absolute;z-index:20;width:min(340px,calc(100% - 16px));max-width:calc(100% - 16px);transform:none;padding:18px 20px;border:1px solid color-mix(in srgb,var(--divider-color) 70%,transparent);border-radius:16px;background:color-mix(in srgb,var(--card-background-color) 96%,transparent);color:var(--primary-text-color);box-shadow:0 8px 28px rgba(0,0,0,.32);font-size:1.15rem;line-height:1.5;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s;overflow-wrap:anywhere}.chart-tooltip.measuring{opacity:0!important;visibility:hidden!important;transition:none!important}.tt-date{font-size:1.05rem;font-weight:600;color:var(--secondary-text-color);margin-bottom:10px}.tt-label{font-size:.95rem;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;letter-spacing:.035em;margin-top:8px}.tt-value{font-size:2rem;font-weight:700;line-height:1.2;margin-top:2px}.tt-change{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:3px;font-size:1.15rem}.tt-change strong{font-size:1.35rem}.tt-change span{color:var(--secondary-text-color);font-size:1.05rem}.tt-change.up strong{color:var(--warning)}.tt-change.down strong{color:var(--accent)}.tt-change.stable strong{color:var(--secondary-text-color)}.tt-stats{display:grid;gap:3px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range{display:flex;justify-content:space-between;gap:12px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range span{color:var(--secondary-text-color)}.tt-range strong{white-space:nowrap}.chart-tooltip.visible{opacity:1;visibility:visible}.chart-tooltip::after{display:none}.no-chart{height:160px;display:grid;place-items:center;color:var(--secondary-text-color);font-size:1rem}
+        .periods{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0 24px 16px;padding:6px;border-radius:18px;background:var(--secondary-background-color)}.period{appearance:none;border:0;border-radius:10px;min-height:48px;padding:10px 14px;background:transparent;color:var(--secondary-text-color);font-size:1.05rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:background .15s,color .15s,box-shadow .15s}.period:hover{background:color-mix(in srgb,var(--accent) 8%,transparent)}.period.active{background:var(--card-background-color);color:var(--accent);font-weight:700;box-shadow:0 1px 3px rgba(0,0,0,.14)}.detail{position:relative;isolation:isolate;overflow:hidden;margin:0 24px 20px;padding:20px;border-radius:20px;background:var(--secondary-background-color)}.detail-head{display:flex;align-items:flex-end;justify-content:space-between;gap:10px}.detail-title{display:flex;align-items:center;gap:12px}.detail-title ha-icon{color:var(--accent)}.detail-title h3{font-size:1.45rem;margin:0;font-weight:600}.detail-value{display:flex;align-items:baseline;gap:5px}.detail-value strong{font-size:2.5rem;font-weight:500}.detail-value small{color:var(--secondary-text-color);font-size:1.2rem}.chart{position:relative;z-index:0;margin-top:18px;overflow:hidden;isolation:isolate;contain:paint}.chart-svg{width:100%;height:220px;display:block;color:var(--neutral);overflow:hidden}.chart-svg.s-good{color:var(--good)}.chart-svg.s-warning{color:var(--warning)}.chart-svg.s-bad{color:var(--bad)}.chart-svg .range .quality-zone{stroke-width:1;stroke-dasharray:5 4}.chart-svg .range .quality-zone.good{fill:color-mix(in srgb,var(--good) 16%,transparent);stroke:color-mix(in srgb,var(--good) 55%,transparent)}.chart-svg .range .quality-zone.warning{fill:color-mix(in srgb,var(--warning) 13%,transparent);stroke:color-mix(in srgb,var(--warning) 45%,transparent)}.chart-svg .range .quality-zone.bad{fill:color-mix(in srgb,var(--bad) 10%,transparent);stroke:color-mix(in srgb,var(--bad) 40%,transparent)}.chart-svg .grid line{stroke:var(--divider-color);stroke-width:1}.chart-svg .area polygon{fill:url(#jblFill)}.chart-svg .segment{stroke:var(--neutral);stroke-width:3;stroke-linecap:round}.chart-svg .segment.st-good{stroke:var(--good)}.chart-svg .segment.st-warning{stroke:var(--warning)}.chart-svg .segment.st-bad{stroke:var(--bad)}.chart-svg .line circle{fill:var(--neutral);stroke:var(--card-background-color);stroke-width:2}.chart-svg .line circle.st-good{fill:var(--good)}.chart-svg .line circle.st-warning{fill:var(--warning)}.chart-svg .line circle.st-bad{fill:var(--bad)}.chart-svg .line .hit{fill:transparent;stroke:none;pointer-events:all;cursor:crosshair}.chart-svg .line .last{stroke-width:3}.axis{display:grid;grid-template-columns:1fr auto 1fr;align-items:start;gap:10px;color:var(--secondary-text-color);font-size:1rem;line-height:1.4;margin-top:10px}.axis span:nth-child(2){text-align:center;font-weight:500}.axis span:last-child{text-align:right}.chart-tooltip{position:absolute;z-index:2;width:min(340px,calc(100% - 16px));max-width:calc(100% - 16px);transform:none;padding:18px 20px;border:1px solid color-mix(in srgb,var(--divider-color) 70%,transparent);border-radius:16px;background:color-mix(in srgb,var(--card-background-color) 96%,transparent);color:var(--primary-text-color);box-shadow:0 8px 28px rgba(0,0,0,.32);font-size:1.15rem;line-height:1.5;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s;overflow-wrap:anywhere}.chart-tooltip.measuring{opacity:0!important;visibility:hidden!important;transition:none!important}.tt-date{font-size:1.05rem;font-weight:600;color:var(--secondary-text-color);margin-bottom:10px}.tt-label{font-size:.95rem;font-weight:600;color:var(--secondary-text-color);text-transform:uppercase;letter-spacing:.035em;margin-top:8px}.tt-value{font-size:2rem;font-weight:700;line-height:1.2;margin-top:2px}.tt-change{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap;margin-top:3px;font-size:1.15rem}.tt-change strong{font-size:1.35rem}.tt-change span{color:var(--secondary-text-color);font-size:1.05rem}.tt-change.up strong{color:var(--warning)}.tt-change.down strong{color:var(--accent)}.tt-change.stable strong{color:var(--secondary-text-color)}.tt-stats{display:grid;gap:3px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range{display:flex;justify-content:space-between;gap:12px;margin-top:11px;padding-top:10px;border-top:1px solid var(--divider-color);font-size:1.05rem}.tt-range span{color:var(--secondary-text-color)}.tt-range strong{white-space:nowrap}.chart-tooltip.visible{opacity:1;visibility:visible}.chart-tooltip::after{display:none}.no-chart{height:160px;display:grid;place-items:center;color:var(--secondary-text-color);font-size:1rem}
          .footer{display:flex;justify-content:space-between;gap:12px;padding:12px 24px 16px;border-top:1px solid var(--divider-color);font-size:.82rem;color:var(--secondary-text-color)}.versions{white-space:nowrap}
         ha-card.compact .header{padding-bottom:8px}ha-card.compact .meta{display:none}ha-card.compact .section-label{display:none}ha-card.compact .metrics{padding-top:2px}.compact .detail{padding:10px}.compact .chart-svg{height:110px}.compact .footer span:first-child{display:none}
         @container (max-width:700px){.metrics{grid-template-columns:repeat(3,minmax(0,1fr))}.metrics:has(.metric:nth-child(6):last-child) .metric:nth-child(5){grid-column:auto}}
