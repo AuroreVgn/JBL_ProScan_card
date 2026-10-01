@@ -132,6 +132,16 @@ The appearance can be customized directly from the visual editor.
 - Critical
 (using the native Home Assistant color picker)
 
+| Parameter | Good | Warning | Critical |
+|---|---:|---:|---:|
+| **pH** | 6.5 ≤ pH ≤ 8.5 | 6.0 ≤ pH < 6.5 ou 8.5 < pH ≤ 9.0 | pH < 6.0 ou pH > 9.0 |
+| **KH** | 5 ≤ KH ≤ 15 °dKH | 3 ≤ KH < 5 ou 15 < KH ≤ 20 °dKH | KH < 3 ou KH > 20 °dKH |
+| **GH** | 4 ≤ GH ≤ 21 °dGH | 2 ≤ GH < 4 ou 21 < GH ≤ 28 °dGH | GH < 2 ou GH > 28 °dGH |
+| **NO₂** | NO₂ = 0 mg/L | 0 < NO₂ ≤ 0.25 mg/L | NO₂ > 0.25 mg/L |
+| **NO₃** | NO₃ ≤ 25 mg/L | 25 < NO₃ ≤ 50 mg/L | NO₃ > 50 mg/L |
+| **CO₂** | Info | — | — |
+| **Chlore** | Chlore = 0 mg/L | 0 < Chlore ≤ 0.8 mg/L | Chlore > 0.8 mg/L |
+
 ### Icons
 Customize every icon using the native Home Assistant icon picker:
 - Header
