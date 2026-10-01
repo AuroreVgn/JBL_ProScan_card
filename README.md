@@ -26,18 +26,31 @@ A modern Lovelace card for the **JBL ProScan** Home Assistant integration.
 - 🎭 Native Home Assistant icon picker
 - ⚙️ Highly customizable
 
+## Water quality thresholds
+
+Each measurement and each point on the history chart is colored individually
+according to the thresholds below.
+
+> Values exactly equal to the lower or upper limit of the recommended range
+> are considered within the recommended range and are therefore displayed in 🟢 green.
+
+| Parameter | 🟢 Good | 🟠 Warning | 🔴 Poor |
+|---|---|---|---|
+| **pH** | 6.5 ≤ pH ≤ 8.5 | 6.0 ≤ pH < 6.5 or 8.5 < pH ≤ 9.0 | pH < 6.0 or pH > 9.0 |
+| **KH** | 5 ≤ KH ≤ 15 °dKH | 3 ≤ KH < 5 or 15 < KH ≤ 20 °dKH | KH < 3 or KH > 20 °dKH |
+| **GH** | 4 ≤ GH ≤ 21 °dGH | 2 ≤ GH < 4 or 21 < GH ≤ 28 °dGH | GH < 2 or GH > 28 °dGH |
+| **NO₂** | 0 ≤ NO₂ ≤ 0.25 mg/L | — | NO₂ > 0.25 mg/L |
+| **NO₃** | NO₃ ≤ 25 mg/L | 25 < NO₃ ≤ 50 mg/L | NO₃ > 50 mg/L |
+| **CO₂** | Information only | — | — |
+| **Chlorine** | 0 ≤ Chlorine ≤ 0.8 mg/L | — | Chlorine > 0.8 mg/L |
+
 ## Screenshots
 
 ### Light mode
-<img width="762" height="1031" alt="image" src="https://github.com/user-attachments/assets/1985667d-bb58-4636-9398-c0945741cf09" />
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/d9880589-87c8-4aca-ae74-e8d79fd6799d" />
 
 ### Dark mode
-<img width="762" height="1031" alt="image" src="https://github.com/user-attachments/assets/c7c45b70-2812-4550-bea3-b244e478ceaa" />
-
-### Visual editor
-<img width="513" height="1173" alt="image" src="https://github.com/user-attachments/assets/d64ccabd-641c-4fbe-b437-85c71a8a93e4" />
-<img width="513" height="551" alt="image" src="https://github.com/user-attachments/assets/bcd6cd50-0965-4f3e-8444-c42f3b3a81cd" />
-
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/67da56b6-22fc-4fc3-b386-657fd10cfeaa" />
 
 ## Installation
 
@@ -131,16 +144,6 @@ The appearance can be customized directly from the visual editor.
 - Warning
 - Critical
 (using the native Home Assistant color picker)
-
-| Parameter | Good | Warning | Critical |
-|---|---|---|---|
-| **pH** | 6.5 ≤ pH ≤ 8.5 | 6.0 ≤ pH < 6.5 ou 8.5 < pH ≤ 9.0 | pH < 6.0 ou pH > 9.0 |
-| **KH** | 5 ≤ KH ≤ 15 °dKH | 3 ≤ KH < 5 ou 15 < KH ≤ 20 °dKH | KH < 3 ou KH > 20 °dKH |
-| **GH** | 4 ≤ GH ≤ 21 °dGH | 2 ≤ GH < 4 ou 21 < GH ≤ 28 °dGH | GH < 2 ou GH > 28 °dGH |
-| **NO₂** | NO₂ = 0 mg/L | 0 < NO₂ ≤ 0.25 mg/L | NO₂ > 0.25 mg/L |
-| **NO₃** | NO₃ ≤ 25 mg/L | 25 < NO₃ ≤ 50 mg/L | NO₃ > 50 mg/L |
-| **CO₂** | Info | — | — |
-| **Chlorine** | Chlore = 0 mg/L | 0 < Chlore ≤ 0.8 mg/L | Chlore > 0.8 mg/L |
 
 ### Icons
 Customize every icon using the native Home Assistant icon picker:
