@@ -1,4 +1,4 @@
-const JBL_PROSCAN_CARD_VERSION = "1.3.8";
+const JBL_PROSCAN_CARD_VERSION = "1.2.1";
 
 const JBL_STRINGS = {
   fr: {
