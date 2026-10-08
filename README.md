@@ -8,7 +8,7 @@
 
 Discover all my Home Assistant integrations and projects on my dedicated page: [**🏠 Discover my Home Assistant Projects**](https://gentle-suggestion-7c3.notion.site/Mes-projets-Home-Assistant-3eda02eefa8f81a48621c3caeef7fa8e)
 
-## ☕️ Support the project
+## ☕ Support the project
 
 If you find this integration useful and would like to support its development and maintenance:
 
@@ -44,7 +44,7 @@ A modern Lovelace card for the **JBL ProScan** Home Assistant integration.
 - 🎭 Native Home Assistant icon picker
 - ⚙️ Highly customizable
 
-## Installation
+## 📦 Installation
 
 ### HACS (recommended)
 
@@ -77,7 +77,7 @@ HACS
 Restart Home Assistant if requested.
 
 
-## Configuration
+## ⚙️ Configuration
 Minimal configuration:
 
 ```yaml
@@ -93,7 +93,7 @@ sensor.bassin_historique
 with your own sensor.
 
 
-## Water quality thresholds
+## 🎛️ Water quality thresholds
 
 Each measurement and each point on the history chart is colored individually
 according to the thresholds below.
@@ -111,7 +111,7 @@ according to the thresholds below.
 | **CO₂** | Information only | — | — |
 | **Chlorine** | 0 ≤ Chlorine ≤ 0.8 mg/L | — | Chlorine > 0.8 mg/L |
 
-## Screenshots
+## 📸 Screenshots
 
 ### Light mode
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/d9880589-87c8-4aca-ae74-e8d79fd6799d" />
@@ -119,7 +119,7 @@ according to the thresholds below.
 ### Dark mode
 <img width="800" alt="image" src="https://github.com/user-attachments/assets/67da56b6-22fc-4fc3-b386-657fd10cfeaa" />
 
-## Visual Editor
+## 🎨 Visual Editor
 The card fully supports the Home Assistant visual editor.
 
 Available options include:
@@ -138,7 +138,7 @@ Available options include:
 No YAML editing required for most users.
 
 
-## Interactive Dashboard
+## 📈 Interactive Dashboard
 The card provides:
 - 📊 Water quality overview
 - 📈 Historical charts
@@ -153,7 +153,7 @@ The card provides:
 - 🖱 Rich interactive tooltips
 - 📊 Home Assistant statistics support
 
-## Customization
+## ⚙️ Customization
 The appearance can be customized directly from the visual editor.
 
 ### Colors
@@ -175,12 +175,12 @@ Customize every icon using the native Home Assistant icon picker:
 - CO₂
 - Chlorine
 
-## Companion Integration
+## 🧩 Companion Integration
 This card requires the **JBL ProScan** integration.
 ➡️ https://github.com/AuroreVgn/JBL_ProScan
 
 
-## License
+## 📄 License
 Distributed under the MIT License.
 
 [releases-shield]: https://img.shields.io/github/v/release/AuroreVgn/JBL_ProScan_Card?style=flat-square
