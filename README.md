@@ -4,6 +4,22 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz/)
 [![Maintainer](https://img.shields.io/badge/Maintainer-AuroreVgn-blue.svg?style=flat-square)](https://github.com/AuroreVgn)
 
+## 🏠 My Home Assistant Projects
+
+Discover all my Home Assistant integrations and projects on my dedicated page: [**🏠 Discover my Home Assistant Projects**](https://gentle-suggestion-7c3.notion.site/Mes-projets-Home-Assistant-3eda02eefa8f81a48621c3caeef7fa8e)
+
+## ☕️ Support the project
+
+If you find this integration useful and would like to support its development and maintenance:
+
+<p>
+  <a href="https://ko-fi.com/aurorevgn">
+    <img src="https://storage.ko-fi.com/cdn/kofi4.png?v=3"
+         alt="Support me on Ko-fi"
+         height="45">
+  </a>
+</p>
+
 ## ⚠️ Important
 
 # JBL ProScan Lovelace Card
@@ -164,25 +180,9 @@ This card requires the **JBL ProScan** integration.
 ➡️ https://github.com/AuroreVgn/JBL_ProScan
 
 
-## ☕️ Support the project
-
-If you find this integration useful and would like to support its development and maintenance:
-
-<p>
-  <a href="https://ko-fi.com/aurorevgn">
-    <img src="https://storage.ko-fi.com/cdn/kofi4.png?v=3"
-         alt="Support me on Ko-fi"
-         height="45">
-  </a>
-</p>
-
 ## License
 Distributed under the MIT License.
 
 [releases-shield]: https://img.shields.io/github/v/release/AuroreVgn/JBL_ProScan_Card?style=flat-square
 [releases]: https://github.com/AuroreVgn/JBL_ProScan_Card/releases
 [license-shield]: https://img.shields.io/github/license/AuroreVgn/JBL_ProScan_Card?style=flat-square
-
-## 🏠 My Home Assistant Projects
-
-Discover all my Home Assistant integrations and projects on my dedicated page: [**🏠 Discover my Home Assistant Projects**](https://gentle-suggestion-7c3.notion.site/Mes-projets-Home-Assistant-3eda02eefa8f81a48621c3caeef7fa8e)
