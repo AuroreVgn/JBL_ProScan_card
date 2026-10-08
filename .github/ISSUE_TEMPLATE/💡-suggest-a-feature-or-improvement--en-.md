@@ -1,10 +1,11 @@
 ---
-name: "🐞 Report a bug"
-about: "Report an issue with JBL ProScan Card"
-title: "[BUG] - "
-labels: "bug"
+name: "\U0001F4A1 Suggest a feature or improvement (EN)"
+about: Suggest an improvement for JBL ProScan Card
+title: "[ENHANCEMENT] - "
+labels: ''
 assignees: AuroreVgn
-type: Bug
+type: Feature
+
 ---
 
 ### Card version
@@ -20,13 +21,6 @@ type: Bug
 - [ ] Read the [README](https://github.com/AuroreVgn/JBL_ProScan_card/blob/main/README.md)
 - [ ] Checked for similar issues
 
-### Problem description
+### Request description
 
-### Steps to reproduce
-
-### Expected behavior
-
-### Logs / screenshots
-```text
-
-```
+### Expected benefit
