@@ -4,22 +4,6 @@
 [![HACS Custom](https://img.shields.io/badge/HACS-Custom-41BDF5.svg?style=flat-square)](https://hacs.xyz/)
 [![Maintainer](https://img.shields.io/badge/Maintainer-AuroreVgn-blue.svg?style=flat-square)](https://github.com/AuroreVgn)
 
-## 🏠 My Home Assistant Projects
-
-Discover all my Home Assistant integrations and projects on my dedicated page: [**🏠 Discover my Home Assistant Projects**](https://gentle-suggestion-7c3.notion.site/Mes-projets-Home-Assistant-3eda02eefa8f81a48621c3caeef7fa8e)
-
-## ☕️ Support the project
-
-If you find this integration useful and would like to support its development and maintenance:
-
-<p>
-  <a href="https://ko-fi.com/aurorevgn">
-    <img src="https://storage.ko-fi.com/cdn/kofi4.png?v=3"
-         alt="Support me on Ko-fi"
-         height="45">
-  </a>
-</p>
-
 ## ⚠️ Important
 
 # JBL ProScan Lovelace Card
@@ -43,32 +27,6 @@ A modern Lovelace card for the **JBL ProScan** Home Assistant integration.
 - 🎨 Native Home Assistant color picker
 - 🎭 Native Home Assistant icon picker
 - ⚙️ Highly customizable
-
-## Water quality thresholds
-
-Each measurement and each point on the history chart is colored individually
-according to the thresholds below.
-
-> Values exactly equal to the lower or upper limit of the recommended range
-> are considered within the recommended range and are therefore displayed in 🟢 green.
-
-| Parameter | 🟢 Good | 🟠 Warning | 🔴 Poor |
-|---|---|---|---|
-| **pH** | 6.5 ≤ pH ≤ 8.5 | 6.0 ≤ pH < 6.5 or 8.5 < pH ≤ 9.0 | pH < 6.0 or pH > 9.0 |
-| **KH** | 5 ≤ KH ≤ 15 °dKH | 3 ≤ KH < 5 or 15 < KH ≤ 20 °dKH | KH < 3 or KH > 20 °dKH |
-| **GH** | 4 ≤ GH ≤ 21 °dGH | 2 ≤ GH < 4 or 21 < GH ≤ 28 °dGH | GH < 2 or GH > 28 °dGH |
-| **NO₂** | 0 ≤ NO₂ ≤ 0.25 mg/L | — | NO₂ > 0.25 mg/L |
-| **NO₃** | NO₃ ≤ 25 mg/L | 25 < NO₃ ≤ 50 mg/L | NO₃ > 50 mg/L |
-| **CO₂** | Information only | — | — |
-| **Chlorine** | 0 ≤ Chlorine ≤ 0.8 mg/L | — | Chlorine > 0.8 mg/L |
-
-## Screenshots
-
-### Light mode
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/d9880589-87c8-4aca-ae74-e8d79fd6799d" />
-
-### Dark mode
-<img width="800" alt="image" src="https://github.com/user-attachments/assets/67da56b6-22fc-4fc3-b386-657fd10cfeaa" />
 
 ## Installation
 
@@ -118,6 +76,32 @@ sensor.bassin_historique
 ```
 with your own sensor.
 
+
+## Water quality thresholds
+
+Each measurement and each point on the history chart is colored individually
+according to the thresholds below.
+
+> Values exactly equal to the lower or upper limit of the recommended range
+> are considered within the recommended range and are therefore displayed in 🟢 green.
+
+| Parameter | 🟢 Good | 🟠 Warning | 🔴 Poor |
+|---|---|---|---|
+| **pH** | 6.5 ≤ pH ≤ 8.5 | 6.0 ≤ pH < 6.5 or 8.5 < pH ≤ 9.0 | pH < 6.0 or pH > 9.0 |
+| **KH** | 5 ≤ KH ≤ 15 °dKH | 3 ≤ KH < 5 or 15 < KH ≤ 20 °dKH | KH < 3 or KH > 20 °dKH |
+| **GH** | 4 ≤ GH ≤ 21 °dGH | 2 ≤ GH < 4 or 21 < GH ≤ 28 °dGH | GH < 2 or GH > 28 °dGH |
+| **NO₂** | 0 ≤ NO₂ ≤ 0.25 mg/L | — | NO₂ > 0.25 mg/L |
+| **NO₃** | NO₃ ≤ 25 mg/L | 25 < NO₃ ≤ 50 mg/L | NO₃ > 50 mg/L |
+| **CO₂** | Information only | — | — |
+| **Chlorine** | 0 ≤ Chlorine ≤ 0.8 mg/L | — | Chlorine > 0.8 mg/L |
+
+## Screenshots
+
+### Light mode
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/d9880589-87c8-4aca-ae74-e8d79fd6799d" />
+
+### Dark mode
+<img width="800" alt="image" src="https://github.com/user-attachments/assets/67da56b6-22fc-4fc3-b386-657fd10cfeaa" />
 
 ## Visual Editor
 The card fully supports the Home Assistant visual editor.
@@ -180,9 +164,25 @@ This card requires the **JBL ProScan** integration.
 ➡️ https://github.com/AuroreVgn/JBL_ProScan
 
 
+## ☕️ Support the project
+
+If you find this integration useful and would like to support its development and maintenance:
+
+<p>
+  <a href="https://ko-fi.com/aurorevgn">
+    <img src="https://storage.ko-fi.com/cdn/kofi4.png?v=3"
+         alt="Support me on Ko-fi"
+         height="45">
+  </a>
+</p>
+
 ## License
 Distributed under the MIT License.
 
 [releases-shield]: https://img.shields.io/github/v/release/AuroreVgn/JBL_ProScan_Card?style=flat-square
 [releases]: https://github.com/AuroreVgn/JBL_ProScan_Card/releases
 [license-shield]: https://img.shields.io/github/license/AuroreVgn/JBL_ProScan_Card?style=flat-square
+
+## 🏠 My Home Assistant Projects
+
+Discover all my Home Assistant integrations and projects on my dedicated page: [**🏠 Discover my Home Assistant Projects**](https://gentle-suggestion-7c3.notion.site/Mes-projets-Home-Assistant-3eda02eefa8f81a48621c3caeef7fa8e)
