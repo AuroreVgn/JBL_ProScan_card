@@ -96,17 +96,36 @@ class JBLProScanCardEditor extends HTMLElement {
     this._render();
   }
   setConfig(value) {
-    this._config = { ...value };
-    if (this._config.measurements == null && this._config.points != null) {
-      this._config.measurements = this._config.points;
+    const next = { ...value };
+    if (next.measurements == null && next.points != null) {
+      next.measurements = next.points;
     }
+    const changed = JSON.stringify(this._config) !== JSON.stringify(next);
+    this._config = next;
+    if (!changed) return;
+    // Home Assistant sends config back after each keystroke. Keep the
+    // current input mounted so typing does not lose focus.
+    const active = this.shadowRoot?.activeElement;
+    if (active && (active.matches?.("input, select, textarea") || active.closest?.("ha-selector"))) return;
     this._render();
   }
   _emit(patch) {
     this._config = { ...this._config, ...patch };
     delete this._config.points;
     this.dispatchEvent(new CustomEvent("config-changed", {
-      detail: { config: (() => { const config = { ...this._config }; delete config.grid_options; return config; })() }, bubbles: true, composed: true
+      detail: { config: (() => {
+        const config = { ...this._config };
+        // Preserve the width chosen in the Sections editor, but never
+        // reintroduce a fixed height that could overlap the next card.
+        if (config.grid_options) {
+          const grid = { ...config.grid_options };
+          delete grid.rows;
+          delete grid.min_rows;
+          if (Object.keys(grid).length) config.grid_options = grid;
+          else delete config.grid_options;
+        }
+        return config;
+      })() }, bubbles: true, composed: true
     }));
   }
   _render() {
